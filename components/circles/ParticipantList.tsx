@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useVirtualList } from "@/hooks/useVirtualList";
 
 export interface Participant {
   address: string;
@@ -13,6 +14,16 @@ export interface Participant {
 interface ParticipantListProps {
   participants: Participant[];
   onSendReminder?: (participants: Participant[]) => void | Promise<void>;
+  /** Seats still available in a pre-launch circle. */
+  seatsRemaining?: number;
+  /** ISO date the circle starts contributing. */
+  startDate?: string;
+  /** Whether the signed-in user organises the circle. */
+  isOrganizer?: boolean;
+  /** Whether every seat of a pre-launch circle is taken. */
+  seatsFilled?: boolean;
+  /** Starts a pre-launch circle right away. */
+  onStartCircle?: () => void;
 }
 
 type SortKey = "address" | "status";
@@ -43,8 +54,45 @@ const STATUS_ORDER: Record<Participant["status"], number> = {
   paid: 2,
 };
 
+// Fixed row height, so the scroll height is known before the rows are
+// measured and the list never shifts while rows load.
+const ROW_HEIGHT = 60;
+const LIST_MAX_HEIGHT = 560;
+
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function formatCountdown(target: number, now: number) {
+  const totalSeconds = Math.max(0, Math.floor((target - now) / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const clock = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return days > 0 ? `${days}d ${clock}` : clock;
+}
+
+/**
+ * Countdown to the moment a pre-launch circle starts contributing.
+ */
+function StartCountdown({ startDate }: { startDate: string }) {
+  const target = useMemo(() => new Date(startDate).getTime(), [startDate]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (Number.isNaN(target)) return <span>soon</span>;
+  if (target <= now) return <span>starting now</span>;
+
+  return (
+    <span className="tabular-nums" aria-live="off">
+      {formatCountdown(target, now)}
+    </span>
+  );
 }
 
 /**
@@ -97,7 +145,15 @@ function exportParticipants(participants: Participant[]) {
   URL.revokeObjectURL(url);
 }
 
-export function ParticipantList({ participants, onSendReminder }: ParticipantListProps) {
+export function ParticipantList({
+  participants,
+  onSendReminder,
+  seatsRemaining,
+  startDate,
+  isOrganizer,
+  seatsFilled,
+  onStartCircle,
+}: ParticipantListProps) {
   const [sortKey, setSortKey] = useState<SortKey>("address");
   const [selectedAddresses, setSelectedAddresses] = useState<Set<string>>(new Set());
   const [reminderSent, setReminderSent] = useState(false);
@@ -111,6 +167,20 @@ export function ParticipantList({ participants, onSendReminder }: ParticipantLis
     }
     return list;
   }, [participants, sortKey]);
+
+  const {
+    scrollRef,
+    virtualItems,
+    topPadding,
+    bottomPadding,
+    containerHeight,
+    handleKeyDown,
+    getRowProps,
+  } = useVirtualList({
+    count: sorted.length,
+    rowHeight: ROW_HEIGHT,
+    maxHeight: LIST_MAX_HEIGHT,
+  });
 
   const selected = participants.filter((participant) => selectedAddresses.has(participant.address));
   const allSelected = participants.length > 0 && selected.length === participants.length;
@@ -213,10 +283,15 @@ export function ParticipantList({ participants, onSendReminder }: ParticipantLis
       )}
       {reminderSent && <p className="border-b border-gray-200 px-4 py-2 text-xs text-green-700 dark:border-[var(--border)] dark:text-green-400" role="status">Reminder queued for the selected participants.</p>}
 
-      {/* Scrollable on mobile, full table on desktop */}
-      <div className="overflow-x-auto">
+      {/* Virtualized table: only the rows inside the viewport are rendered */}
+      <div
+        ref={scrollRef}
+        onKeyDown={handleKeyDown}
+        className="overflow-auto"
+        style={participants.length === 0 ? undefined : { height: containerHeight }}
+      >
         <table className="w-full min-w-[480px] text-left text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-white dark:bg-[var(--content)]">
             <tr className="border-b border-gray-100 dark:border-[var(--border)] text-xs uppercase tracking-wide text-gray-400 dark:text-[var(--muted)]">
               <th className="w-10 px-4 py-2 font-medium"><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all participants" /></th>
               <th className="px-4 py-2 font-medium">Participant</th>
@@ -225,36 +300,57 @@ export function ParticipantList({ participants, onSendReminder }: ParticipantLis
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-[var(--border)]">
-            {sorted.map((participant) => (
-              <tr key={participant.address}>
-                <td className="px-4 py-3"><input type="checkbox" checked={selectedAddresses.has(participant.address)} onChange={() => toggleSelected(participant.address)} aria-label={`Select ${truncateAddress(participant.address)}`} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar address={participant.address} />
-                    <Link href={`/dashboard/profile/${encodeURIComponent(participant.address)}`} className="font-mono text-sm text-gray-800 hover:underline dark:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
-                      {truncateAddress(participant.address)}
-                    </Link>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={participant.status} />
-                    {participant.role && (
-                      <span className="rounded-full bg-[var(--ov-0a)] px-2.5 py-0.5 text-xs font-medium text-[var(--muted)]">
-                        {participant.role === "organizer"
-                          ? "Organizer"
-                          : participant.role === "co-organizer"
-                            ? "Co-Organizer"
-                            : "Participant"}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-700 dark:text-[var(--muted)]">
-                  {participant.roundsPaid}
-                </td>
+            {topPadding > 0 && (
+              <tr aria-hidden="true" style={{ height: topPadding }}>
+                <td colSpan={4} className="p-0" />
               </tr>
-            ))}
+            )}
+            {virtualItems.map((virtualRow) => {
+              const participant = sorted[virtualRow.index];
+              if (!participant) return null;
+              return (
+                <tr
+                  key={participant.address}
+                  {...getRowProps(virtualRow.index)}
+                  aria-setsize={sorted.length}
+                  aria-posinset={virtualRow.index + 1}
+                  style={{ height: ROW_HEIGHT }}
+                  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4B6B76]"
+                >
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedAddresses.has(participant.address)} onChange={() => toggleSelected(participant.address)} aria-label={`Select ${truncateAddress(participant.address)}`} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar address={participant.address} />
+                      <Link href={`/dashboard/profile/${encodeURIComponent(participant.address)}`} className="font-mono text-sm text-gray-800 hover:underline dark:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
+                        {truncateAddress(participant.address)}
+                      </Link>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={participant.status} />
+                      {participant.role && (
+                        <span className="rounded-full bg-[var(--ov-0a)] px-2.5 py-0.5 text-xs font-medium text-[var(--muted)]">
+                          {participant.role === "organizer"
+                            ? "Organizer"
+                            : participant.role === "co-organizer"
+                              ? "Co-Organizer"
+                              : "Participant"}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-[var(--muted)]">
+                    {participant.roundsPaid}
+                  </td>
+                </tr>
+              );
+            })}
+            {bottomPadding > 0 && (
+              <tr aria-hidden="true" style={{ height: bottomPadding }}>
+                <td colSpan={4} className="p-0" />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

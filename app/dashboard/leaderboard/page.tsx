@@ -4,10 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Trophy, Flame, PiggyBank, Medal } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
+import { useVirtualList } from "@/hooks/useVirtualList";
 
 const CURRENT_WALLET = "0x23g43gdaa8f2c5b1e9d0f7a34bc6e12d8a9f5c3b";
 
 type View = "savers" | "reliable";
+
+// Fixed row heights, so the scroll height is known before the rows are
+// measured and the list never shifts while rows load.
+const TABLE_ROW_HEIGHT = 70;
+const CARD_ROW_HEIGHT = 132;
+const LIST_MAX_HEIGHT = 640;
 
 /**
  * Shape mirrors the aggregate a future `/api/leaderboard` would return per
@@ -102,6 +109,34 @@ export default function LeaderboardPage() {
   const currentUser = ranked.find((e) => e.address === CURRENT_WALLET);
   const isEmpty = ranked.length === 0;
 
+  // Both the desktop table and the mobile cards are virtualized, so only the
+  // rows inside the viewport are mounted.
+  const {
+    scrollRef: tableScrollRef,
+    virtualItems: tableRows,
+    topPadding: tableTopPadding,
+    bottomPadding: tableBottomPadding,
+    containerHeight: tableHeight,
+    handleKeyDown: handleTableKeyDown,
+    getRowProps: getTableRowProps,
+  } = useVirtualList({
+    count: ranked.length,
+    rowHeight: TABLE_ROW_HEIGHT,
+    maxHeight: LIST_MAX_HEIGHT,
+  });
+  const {
+    scrollRef: cardsScrollRef,
+    virtualItems: cardRows,
+    totalSize: cardsTotalSize,
+    containerHeight: cardsHeight,
+    handleKeyDown: handleCardsKeyDown,
+    getRowProps: getCardRowProps,
+  } = useVirtualList({
+    count: ranked.length,
+    rowHeight: CARD_ROW_HEIGHT,
+    maxHeight: LIST_MAX_HEIGHT,
+  });
+
   return (
     <div className="space-y-8 pb-20 md:pb-0">
       {/* Title */}
@@ -174,130 +209,177 @@ export default function LeaderboardPage() {
           <>
             {/* Desktop table */}
             <div className="hidden overflow-hidden rounded-3xl border border-[#ffffff12] bg-[#18181A] md:block">
-              <table className="min-w-full divide-y divide-[#ffffff0f]">
-                <caption className="sr-only">
-                  {view === "savers"
-                    ? "Participants ranked by total amount saved"
-                    : "Participants ranked by on-time contribution streak"}
-                </caption>
-                <thead className="bg-[#ffffff05] text-left text-xs uppercase tracking-[0.18em] text-[#9A9A9A]">
-                  <tr>
-                    <th scope="col" className="px-6 py-4 font-medium">Rank</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Participant</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Total Saved</th>
-                    <th scope="col" className="px-6 py-4 font-medium">On-Time Streak</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Circles</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#ffffff0f]">
-                  {ranked.map((entry) => {
-                    const isYou = entry.address === CURRENT_WALLET;
-                    return (
-                      <tr
-                        key={entry.address}
-                        aria-current={isYou ? "true" : undefined}
-                        className={
-                          isYou
-                            ? "bg-[#4B6B7620] outline outline-1 -outline-offset-1 outline-[#4B6B7655]"
-                            : "transition-colors hover:bg-[#ffffff06]"
-                        }
-                      >
-                        <td className="px-6 py-4">
-                          <RankBadge rank={entry.rank} />
-                        </td>
-                        <td className="px-6 py-4">
+              <div
+                ref={tableScrollRef}
+                onKeyDown={handleTableKeyDown}
+                className="overflow-auto"
+                style={{ height: tableHeight }}
+              >
+                <table className="min-w-full divide-y divide-[#ffffff0f]">
+                  <caption className="sr-only">
+                    {view === "savers"
+                      ? "Participants ranked by total amount saved"
+                      : "Participants ranked by on-time contribution streak"}
+                  </caption>
+                  <thead className="sticky top-0 z-10 bg-[#18181A] text-left text-xs uppercase tracking-[0.18em] text-[#9A9A9A]">
+                    <tr>
+                      <th scope="col" className="px-6 py-4 font-medium">Rank</th>
+                      <th scope="col" className="px-6 py-4 font-medium">Participant</th>
+                      <th scope="col" className="px-6 py-4 font-medium">Total Saved</th>
+                      <th scope="col" className="px-6 py-4 font-medium">On-Time Streak</th>
+                      <th scope="col" className="px-6 py-4 font-medium">Circles</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#ffffff0f]">
+                    {tableTopPadding > 0 && (
+                      <tr aria-hidden="true" style={{ height: tableTopPadding }}>
+                        <td colSpan={5} className="p-0" />
+                      </tr>
+                    )}
+                    {tableRows.map((virtualRow) => {
+                      const entry = ranked[virtualRow.index];
+                      if (!entry) return null;
+                      const isYou = entry.address === CURRENT_WALLET;
+                      return (
+                        <tr
+                          key={entry.address}
+                          {...getTableRowProps(virtualRow.index)}
+                          aria-setsize={ranked.length}
+                          aria-posinset={virtualRow.index + 1}
+                          style={{ height: TABLE_ROW_HEIGHT }}
+                          aria-current={isYou ? "true" : undefined}
+                          className={`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4B6B76] ${
+                            isYou
+                              ? "bg-[#4B6B7620] outline outline-1 -outline-offset-1 outline-[#4B6B7655]"
+                              : "transition-colors hover:bg-[#ffffff06]"
+                          }`}
+                        >
+                          <td className="px-6 py-4">
+                            <RankBadge rank={entry.rank} />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Link href={`/dashboard/profile/${encodeURIComponent(entry.address)}`} className="text-sm font-medium text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
+                                {entry.alias ?? shortAddress(entry.address)}
+                              </Link>
+                              {isYou && (
+                                <span className="rounded-full bg-[#4B6B76] px-2 py-0.5 text-[10px] font-semibold text-white">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            {entry.alias && (
+                              <span className="font-mono text-xs text-[#9A9A9A]">
+                                {shortAddress(entry.address)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-semibold text-white">
+                            {entry.totalSaved.toLocaleString()} {entry.tokenSymbol}
+                          </td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className="inline-flex items-center gap-1.5 text-[#C7C7C7]">
+                              <Flame size={14} className="text-[#FBBF24]" aria-hidden="true" />
+                              {entry.onTimeStreak} rounds
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-[#C7C7C7]">
+                            {entry.circlesJoined}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {tableBottomPadding > 0 && (
+                      <tr aria-hidden="true" style={{ height: tableBottomPadding }}>
+                        <td colSpan={5} className="p-0" />
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile cards */}
+            <div
+              ref={cardsScrollRef}
+              onKeyDown={handleCardsKeyDown}
+              className="overflow-auto md:hidden"
+              style={{ height: cardsHeight }}
+            >
+              <ul
+                role="list"
+                className="relative list-none p-0"
+                style={{ height: cardsTotalSize }}
+              >
+                {cardRows.map((virtualRow) => {
+                  const entry = ranked[virtualRow.index];
+                  if (!entry) return null;
+                  const isYou = entry.address === CURRENT_WALLET;
+                  return (
+                    <li
+                      key={entry.address}
+                      role="listitem"
+                      {...getCardRowProps(virtualRow.index)}
+                      aria-setsize={ranked.length}
+                      aria-posinset={virtualRow.index + 1}
+                      aria-current={isYou ? "true" : undefined}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      className={`rounded-2xl p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4B6B76] ${
+                        isYou
+                          ? "bg-[#4B6B7620] outline outline-1 -outline-offset-1 outline-[#4B6B7655]"
+                          : "bg-[#212124]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RankBadge rank={entry.rank} />
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <Link href={`/dashboard/profile/${encodeURIComponent(entry.address)}`} className="text-sm font-medium text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
+                            <Link href={`/dashboard/profile/${encodeURIComponent(entry.address)}`} className="truncate text-sm font-medium text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
                               {entry.alias ?? shortAddress(entry.address)}
                             </Link>
                             {isYou && (
-                              <span className="rounded-full bg-[#4B6B76] px-2 py-0.5 text-[10px] font-semibold text-white">
+                              <span className="shrink-0 rounded-full bg-[#4B6B76] px-2 py-0.5 text-[10px] font-semibold text-white">
                                 You
                               </span>
                             )}
                           </div>
-                          {entry.alias && (
-                            <span className="font-mono text-xs text-[#9A9A9A]">
-                              {shortAddress(entry.address)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-white">
-                          {entry.totalSaved.toLocaleString()} {entry.tokenSymbol}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className="inline-flex items-center gap-1.5 text-[#C7C7C7]">
-                            <Flame size={14} className="text-[#FBBF24]" aria-hidden="true" />
-                            {entry.onTimeStreak} rounds
+                          <span className="font-mono text-xs text-[#9A9A9A]">
+                            {shortAddress(entry.address)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-[#C7C7C7]">
-                          {entry.circlesJoined}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile cards */}
-            <ul className="space-y-2 md:hidden list-none p-0">
-              {ranked.map((entry) => {
-                const isYou = entry.address === CURRENT_WALLET;
-                return (
-                  <li
-                    key={entry.address}
-                    aria-current={isYou ? "true" : undefined}
-                    className={`rounded-2xl p-4 ${
-                      isYou
-                        ? "bg-[#4B6B7620] outline outline-1 -outline-offset-1 outline-[#4B6B7655]"
-                        : "bg-[#212124]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <RankBadge rank={entry.rank} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/dashboard/profile/${encodeURIComponent(entry.address)}`} className="truncate text-sm font-medium text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B6B76]">
-                            {entry.alias ?? shortAddress(entry.address)}
-                          </Link>
-                          {isYou && (
-                            <span className="shrink-0 rounded-full bg-[#4B6B76] px-2 py-0.5 text-[10px] font-semibold text-white">
-                              You
-                            </span>
-                          )}
                         </div>
-                        <span className="font-mono text-xs text-[#9A9A9A]">
-                          {shortAddress(entry.address)}
-                        </span>
                       </div>
-                    </div>
 
-                    <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-[#ffffff0f] pt-3">
-                      <div>
-                        <dt className="text-[11px] text-[#9A9A9A]">Saved</dt>
-                        <dd className="mt-0.5 text-sm font-semibold text-white">
-                          {entry.totalSaved.toLocaleString()}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[11px] text-[#9A9A9A]">Streak</dt>
-                        <dd className="mt-0.5 text-sm font-semibold text-white">
-                          {entry.onTimeStreak}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[11px] text-[#9A9A9A]">Circles</dt>
-                        <dd className="mt-0.5 text-sm font-semibold text-white">
-                          {entry.circlesJoined}
-                        </dd>
-                      </div>
-                    </dl>
-                  </li>
-                );
-              })}
-            </ul>
+                      <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-[#ffffff0f] pt-3">
+                        <div>
+                          <dt className="text-[11px] text-[#9A9A9A]">Saved</dt>
+                          <dd className="mt-0.5 text-sm font-semibold text-white">
+                            {entry.totalSaved.toLocaleString()}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[11px] text-[#9A9A9A]">Streak</dt>
+                          <dd className="mt-0.5 text-sm font-semibold text-white">
+                            {entry.onTimeStreak}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[11px] text-[#9A9A9A]">Circles</dt>
+                          <dd className="mt-0.5 text-sm font-semibold text-white">
+                            {entry.circlesJoined}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </>
         )}
       </div>
