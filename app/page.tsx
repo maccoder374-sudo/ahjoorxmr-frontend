@@ -8,10 +8,13 @@ import CalculatorSection from "@/components/sections/CalculatorSection";
 import WhyAhjoor from "@/components/sections/WhyAhjoor";
 import Testimonials from "@/components/sections/Testimonials";
 import FAQSection from "@/components/sections/FAQSection";
+import JsonLd from "@/components/seo/JsonLd";
+import { buildOrganizationJsonLd } from "@/lib/seo/jsonLd";
 
 export default function Home() {
   return (
     <main>
+      <JsonLd data={buildOrganizationJsonLd()} />
       <Navbar />
       <HeroSection />
       <SupportedBy />
