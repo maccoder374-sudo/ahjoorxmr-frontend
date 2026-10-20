@@ -26,6 +26,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
+    <ConnectionStatusProvider>
     <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex print:hidden w-[260px] flex-col border-r border-[var(--ov-0f)] bg-[var(--surface)]">
@@ -35,6 +36,7 @@ export default function DashboardLayout({
             <div className="w-8 h-8 rounded-full border border-white flex items-center justify-center" aria-hidden="true">
               <span className="font-bold text-sm">$</span>
             </div>
+          </div>
 
           {/* Navigation */}
           <nav aria-label="Dashboard navigation">
@@ -111,6 +113,7 @@ export default function DashboardLayout({
                     <Users size={20} aria-hidden="true" />
                     <span className="font-medium">Circles</span>
                   </Link>
+                </FeatureSpotlight>
                 </li>
                 <li>
                   <Link
@@ -245,8 +248,8 @@ export default function DashboardLayout({
         <OnboardingModal />
         <FeedbackWidget />
         <ShortcutsModal />
-      </div>
       </NetworkGuard>
-    </ConnectionStatusProvider>
+    </div>
+  </ConnectionStatusProvider>
   );
 }
