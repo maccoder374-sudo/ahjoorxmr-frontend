@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Service — Ahjoor",
   description:
     "The terms governing use of Ahjoor's decentralized savings circles.",
-};
+  path: "/terms",
+});
 
 const LAST_UPDATED = "July 28, 2026";
 

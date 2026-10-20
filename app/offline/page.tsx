@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { WifiOff } from "lucide-react";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "You're offline — Ahjoor",
-};
+  description:
+    "Ahjoor could not reach the network. Reconnect to keep contributing to your savings circles.",
+  path: "/offline",
+});
 
 export default function OfflinePage() {
   return (

@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
 import Navbar from "@/components/layout/Navbar/Navbar";
 import Footer from "@/components/layout/Footer/Footer";
 import SavingsCalculator from "@/components/calculator/SavingsCalculator";
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Savings Calculator — Ahjoor",
+  description:
+    "Simulate your savings circle: project round-by-round payouts, total savings and the payout timeline for your group size and contribution amount.",
+  path: "/calculator",
+});
 
 export default function CalculatorPage() {
   return (

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy — Ahjoor",
   description: "How Ahjoor handles wallet addresses, on-chain activity, and optional profile information.",
-};
+  path: "/privacy",
+});
 
 const LAST_UPDATED = "July 28, 2026";
 

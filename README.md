@@ -93,6 +93,7 @@ All of the following are `NEXT_PUBLIC_*` variables, which Next.js inlines into b
 | `NEXT_PUBLIC_STARKNET_RPC_URL` | No | _unset_ (static estimate) | Starknet RPC endpoint used to estimate on-chain gas fees (`lib/gasFee.ts`). |
 | `NEXT_PUBLIC_OFFRAMP_ENABLED` | No | `true` | Set to `"false"` to hide the bank-transfer off-ramp payout method (`lib/payoutMethods.ts`). |
 | `NEXT_PUBLIC_OFFRAMP_PARTNER` | No | `Bank transfer partner` | Display name for the off-ramp partner shown in payout method UI. |
+| `NEXT_PUBLIC_SITE_URL` | No | `http://localhost:3000` | Public origin of the deployed site (include the scheme). Used to build absolute URLs for `sitemap.xml`, `robots.txt`, canonical links and JSON-LD (`lib/seo/siteUrl.ts`). |
 
 > Note: a dedicated env validation layer (schema-checked env vars at startup) is tracked separately and is out of scope here — this table only documents what the app currently reads from `process.env`.
 

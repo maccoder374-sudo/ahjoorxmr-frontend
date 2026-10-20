@@ -1,5 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass, Home } from "lucide-react";
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Page not found — Ahjoor",
+  description:
+    "The page you are looking for may have been moved, renamed, or never existed.",
+  path: "/",
+});
 
 export default function NotFound() {
   return (

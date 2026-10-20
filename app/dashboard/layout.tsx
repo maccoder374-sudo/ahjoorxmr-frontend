@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LayoutGrid, Lock, FileText, Settings, Users, LogOut, Wallet, Trophy, Bell, HelpCircle, Award, Target } from "lucide-react";
 import CopyButton from "@/components/ui/CopyButton";
@@ -19,6 +20,12 @@ import TrustlineBanner from "@/components/wallet/TrustlineBanner";
 
 const WALLET_ADDRESS = "0x23g43gdaa8f2c5b1e9d0f7a34bc6e12d8a9f5c3b";
 const WALLET_DISPLAY = "0x23g43gdaa...";
+
+// The dashboard is a private, authenticated area: keep it out of search results.
+export const metadata: Metadata = {
+  title: "Dashboard — Ahjoor",
+  robots: { index: false, follow: false },
+};
 
 export default function DashboardLayout({
   children,
