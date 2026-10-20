@@ -93,6 +93,8 @@ All of the following are `NEXT_PUBLIC_*` variables, which Next.js inlines into b
 | `NEXT_PUBLIC_STARKNET_RPC_URL` | No | _unset_ (static estimate) | Starknet RPC endpoint used to estimate on-chain gas fees (`lib/gasFee.ts`). |
 | `NEXT_PUBLIC_OFFRAMP_ENABLED` | No | `true` | Set to `"false"` to hide the bank-transfer off-ramp payout method (`lib/payoutMethods.ts`). |
 | `NEXT_PUBLIC_OFFRAMP_PARTNER` | No | `Bank transfer partner` | Display name for the off-ramp partner shown in payout method UI. |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | _unset_ (monitoring disabled) | Sentry DSN for error monitoring on the client, the server and the edge runtime. When unset the Sentry SDK is never initialised, no event is captured and nothing is sent. |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | No | _unset_ | Sentry organisation, project and auth token. Only used to upload the source maps during `pnpm build`, and only when `NEXT_PUBLIC_SENTRY_DSN` is set as well. |
 
 > Note: a dedicated env validation layer (schema-checked env vars at startup) is tracked separately and is out of scope here — this table only documents what the app currently reads from `process.env`.
 

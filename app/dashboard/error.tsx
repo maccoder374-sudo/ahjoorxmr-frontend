@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
+import { captureException } from "@sentry/nextjs";
+import { isSentryEnabled } from "@/lib/sentry/config";
 
 interface Props {
   error: Error & { digest?: string };
@@ -11,6 +13,9 @@ interface Props {
 export default function DashboardError({ error, reset }: Props) {
   useEffect(() => {
     console.error("[Dashboard Error]", error);
+    if (isSentryEnabled()) {
+      captureException(error);
+    }
   }, [error]);
 
   return (
